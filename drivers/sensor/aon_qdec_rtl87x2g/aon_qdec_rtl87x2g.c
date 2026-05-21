@@ -11,6 +11,8 @@
 #include <soc.h>
 
 #include <rtl_aon_qdec.h>
+#include <zephyr/pm/device.h>
+#include <zephyr/pm/policy.h>
 
 #include <zephyr/irq.h>
 #include <zephyr/logging/log.h>
@@ -19,6 +21,64 @@ LOG_MODULE_REGISTER(aon_qdec_rtl87x2g, CONFIG_SENSOR_LOG_LEVEL);
 #define FULL_ANGLE 360
 #define MAX_ACC_CNT_BITS 16
 
+//add by cwl
+#define QDEC_X_PHA_PIN P9_0
+#define QDEC_X_PHB_PIN P9_1
+#include "rtl_gpio.h"
+#include <rtl_pinmux.h>
+
+void qdec_io_read(void)
+{
+    AON_QDEC_CounterPauseCmd(AON_QDEC, AON_QDEC_AXIS_X, ENABLE);
+    // AON_QDEC_Cmd(AON_QDEC, AON_QDEC_AXIS_X, DISABLE);
+    
+    //note:p6_2/p6_3,p9_0/p9_1 share the same pin!
+    Pinmux_Deinit(P6_2);
+    Pinmux_Deinit(P6_3);
+
+    Pinmux_Config(QDEC_X_PHA_PIN, DWGPIO);
+    Pinmux_Config(QDEC_X_PHB_PIN, DWGPIO);
+    Pad_Config(QDEC_X_PHA_PIN, PAD_PINMUX_MODE, PAD_IS_PWRON, PAD_PULL_NONE, PAD_OUT_DISABLE,
+               PAD_OUT_LOW);
+    Pad_Config(QDEC_X_PHB_PIN, PAD_PINMUX_MODE, PAD_IS_PWRON, PAD_PULL_NONE, PAD_OUT_DISABLE,
+               PAD_OUT_LOW);
+    
+
+    int pha_wakeup_level = GPIO_ReadInputDataBit(GPIO_GetPort(QDEC_X_PHA_PIN),
+                                                            GPIO_GetPin(QDEC_X_PHA_PIN));
+    int phb_wakeup_level = GPIO_ReadInputDataBit(GPIO_GetPort(QDEC_X_PHB_PIN),
+                                                            GPIO_GetPin(QDEC_X_PHB_PIN));
+
+    Pinmux_AON_Config(QDPH0_IN_P9_0_P9_1);
+
+    Pinmux_Config(P6_2, DWGPIO);
+    Pinmux_Config(P6_3, DWGPIO);
+    Pad_Config(P6_2, PAD_PINMUX_MODE, PAD_IS_PWRON, PAD_PULL_DOWN, PAD_OUT_DISABLE,
+               PAD_OUT_LOW);
+    Pad_Config(P6_3, PAD_PINMUX_MODE, PAD_IS_PWRON, PAD_PULL_DOWN, PAD_OUT_DISABLE,
+               PAD_OUT_LOW);
+    AON_QDEC_CounterPauseCmd(AON_QDEC, AON_QDEC_AXIS_X, DISABLE);  
+    // AON_QDEC_Cmd(AON_QDEC, AON_QDEC_AXIS_X, ENABLE);
+    // LOG_WRN("a,b=[%d,%d],gpiob:%x",pha_wakeup_level,phb_wakeup_level,GPIOB->GPIO_PAD_STATE);
+  
+    if (pha_wakeup_level)
+    {
+        System_WakeUpPinEnable(QDEC_X_PHA_PIN, PAD_WAKEUP_POL_LOW, PAD_WAKEUP_DEB_DISABLE);
+    }
+    else
+    {
+        System_WakeUpPinEnable(QDEC_X_PHA_PIN, PAD_WAKEUP_POL_HIGH, PAD_WAKEUP_DEB_DISABLE);
+    }
+
+    if (phb_wakeup_level)
+    {
+        System_WakeUpPinEnable(QDEC_X_PHB_PIN, PAD_WAKEUP_POL_LOW, PAD_WAKEUP_DEB_DISABLE);
+    }
+    else
+    {
+        System_WakeUpPinEnable(QDEC_X_PHB_PIN, PAD_WAKEUP_POL_HIGH, PAD_WAKEUP_DEB_DISABLE);
+    }
+}
 struct aon_qdec_rtl87x2g_data
 {
     int32_t acc;
@@ -67,13 +127,16 @@ static int aon_qdec_rtl87x2g_channel_get(const struct device *dev,
 {
     struct aon_qdec_rtl87x2g_data *data = dev->data;
     int32_t acc;
-
-    acc = (int32_t)data->acc;
+    //change: report delta by cwl@2024/07/05
+    static int32_t last_acc=0;  //add
+    // acc = (int32_t)data->acc;
+    acc = (int32_t)(data->acc-last_acc); //add
 
     switch (chan)
     {
     case SENSOR_CHAN_ROTATION:
-        val->val1 = FULL_ANGLE / data->counts_per_revolution * acc;
+        // val->val1 = FULL_ANGLE / data->counts_per_revolution * acc;
+        val->val1 = FULL_ANGLE / (data->counts_per_revolution*10) * acc; //add
         val->val2 = 0;
         break;
     default:
@@ -82,7 +145,7 @@ static int aon_qdec_rtl87x2g_channel_get(const struct device *dev,
 
     LOG_DBG("acc=%d, counts_per_revolution=%d, val1=%d\n", \
             acc, data->counts_per_revolution, val->val1);
-
+    last_acc = data->acc; //add
     return 0;
 }
 
@@ -144,6 +207,7 @@ static void aon_qdec_rtl87x2g_isr(const struct device *dev)
         AON_QDEC_ClearINTPendingBit(aon_qdec, AON_QDEC_CLR_NEW_CT_X);
         handler = data->data_ready_handler;
         trig = data->data_ready_trigger;
+        LOG_DBG("qdec trig");
         if (handler)
         {
             handler(dev, trig);
@@ -207,6 +271,46 @@ static int aon_qdec_rtl87x2g_init(const struct device *dev)
 
     return ret;
 }
+#ifdef CONFIG_PM_DEVICE
+static int aon_qdec_rtl87x2g_pm_action(const struct device *dev,
+                                  enum pm_device_action action)
+{
+    const struct aon_qdec_rtl87x2g_config *config = dev->config;
+
+    int err;
+
+
+    switch (action)
+    {
+    case PM_DEVICE_ACTION_SUSPEND:
+
+        qdec_io_read();
+        /* Move pins to sleep state */
+        err = pinctrl_apply_state(config->pcfg, PINCTRL_STATE_SLEEP);
+        if ((err < 0) && (err != -ENOENT))
+        {
+            return err;
+        }
+        break;
+    case PM_DEVICE_ACTION_RESUME:
+        /* Set pins to active state */
+        err = pinctrl_apply_state(config->pcfg, PINCTRL_STATE_DEFAULT);
+        if (err < 0)
+        {
+            return err;
+        }
+
+
+
+        break;
+    default:
+        return -ENOTSUP;
+    }
+
+    return 0;
+}
+#endif /* CONFIG_PM_DEVICE */
+
 
 #define AON_QDEC_RTL87X2G_INIT(index)                       \
     PINCTRL_DT_INST_DEFINE(index);                  \
@@ -229,8 +333,8 @@ static int aon_qdec_rtl87x2g_init(const struct device *dev)
                         .debounce_time_ms = DT_INST_PROP(index, debounce_time_ms),    \
                                             .counts_per_revolution = DT_INST_PROP(index, counts_per_revolution),        \
     };      \
-    \
-    SENSOR_DEVICE_DT_INST_DEFINE(index, aon_qdec_rtl87x2g_init, NULL,   \
+    PM_DEVICE_DT_INST_DEFINE(index, aon_qdec_rtl87x2g_pm_action);    \
+    SENSOR_DEVICE_DT_INST_DEFINE(index, aon_qdec_rtl87x2g_init, PM_DEVICE_DT_INST_GET(index),   \
                                  &aon_qdec##index##_rtl87x2g_data, &aon_qdec##index##_rtl87x2g_config, \
                                  POST_KERNEL, CONFIG_SENSOR_INIT_PRIORITY,   \
                                  &aon_qdec_rtl87x2g_driver_api);

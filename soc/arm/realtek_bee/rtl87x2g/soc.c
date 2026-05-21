@@ -187,6 +187,18 @@ static int rtk_register_update(void)
 	SCB->CCR &= ~SCB_CCR_DIV_0_TRP_Msk;
 	return 0;
 }
+/* Overrides the weak ARM implementation */
+void sys_arch_reboot(int type)
+{
+	extern void WDG_SystemReset(int wdt_mode, int reset_reason);
+	WDG_SystemReset(0, type);
+}
+#ifdef CONFIG_ARCH_HAS_CUSTOM_BUSY_WAIT
+void arch_busy_wait(uint32_t usec_to_wait)
+{
+	platform_delay_us(usec_to_wait);
+}
+#endif
 
 SYS_INIT(rtk_platform_init, EARLY, 0);
 SYS_INIT(rtk_register_update, PRE_KERNEL_2, 1);

@@ -338,7 +338,7 @@ void z_vrfy_sys_clock_tick_set(uint64_t tick)
 }
 #endif
 
-/* to realize the realtek power manager, we have to export these four APIs */
+/* To support RTK PM */
 struct _timeout *get_first_timeout(void)
 {
     sys_dnode_t *t = sys_dlist_peek_head(&timeout_list);
@@ -357,8 +357,23 @@ void sys_clock_announce_only_add_ticks(int32_t ticks)
 {
 	k_spinlock_key_t key = k_spin_lock(&timeout_lock);
 
-	announce_remaining += ticks;
 	curr_tick += ticks;
+
+	struct _timeout *t;
+
+	for (t = first();
+	     (t != NULL) && (t->dticks <= ticks);
+	     t = next(t)) {
+		int dt = t->dticks;
+
+		t->dticks = 0;
+
+		ticks -= dt;
+	}
+
+	if (t != NULL) {
+		t->dticks -= ticks;
+	}
 
 	k_spin_unlock(&timeout_lock, key);
 }
@@ -370,30 +385,11 @@ void sys_clock_announce_process_timeout(void)
 	struct _timeout *t;
 
 	for (t = first();
-	     (t != NULL) && (t->dticks <= announce_remaining);
+	     (t != NULL) && (t->dticks == 0);
 	     t = first()) {
-		int dt = t->dticks;
-
-		t->dticks = 0;
 		remove_timeout(t);
-
-		k_spin_unlock(&timeout_lock, key);
 		t->fn(t);
-		key = k_spin_lock(&timeout_lock);
-		announce_remaining -= dt;
 	}
-
-	if (t != NULL) {
-		t->dticks -= announce_remaining;
-	}
-
-	announce_remaining = 0;
-
-	sys_clock_set_timeout(next_timeout(), false);
 
 	k_spin_unlock(&timeout_lock, key);
-
-#ifdef CONFIG_TIMESLICING
-	z_time_slice();
-#endif
 }

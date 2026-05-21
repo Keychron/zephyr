@@ -69,9 +69,12 @@ properties:
     required: true
 
   is-bypass-mode:
-    type: boolean
+    type: int
+    default: 0
     description: |
-      Config adc channels as bypass mode or divide mode.
+      This is a channel map to configure bypass/divide mode for each adc channel.
+      For example, configure 0x05 means channel0 and channel2 are configured as bypass mode,
+      and other channels are configured as divide mode by default.
       In "divide mode" the ADC range is 0 to 3.3V.
       In "bypass mode" the ADC range is 0 to 0.9V.
 

@@ -15,7 +15,7 @@ config USE_HAL_REALTEK_TIM
 	  Enable HAL REALTEK TIM driver
 
 config USE_HAL_REALTEK_ENHTIM
-	bool
+	bool "Enable HAL REALTEK ENHTIM driver"
 	help
 	  Enable HAL REALTEK ENHTIM driver
 

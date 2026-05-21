@@ -157,7 +157,7 @@ static void kscan_rtl87x2g_isr(const struct device *dev)
                                 /* another key in the same row, which is ghost key */
                                 if (new_keys[i].row == new_keys[j].row)
                                 {
-                                    LOG_ERR("ghost key detected!\n");
+                                    // LOG_ERR("ghost key detected!\n");
                                     KeyScan_ClearINTPendingBit(keyscan, KEYSCAN_INT_SCAN_END);
                                     KeyScan_INTMask(keyscan, KEYSCAN_INT_SCAN_END, DISABLE);
                                     return;
@@ -461,7 +461,7 @@ static int kscan_rtl87x2g_init(const struct device *dev)
                           &kscan_rtl87x2g_init,                                  \
                           PM_DEVICE_DT_INST_GET(index),                           \
                           &kscan_rtl87x2g_data_##index, &kscan_rtl87x2g_cfg_##index,    \
-                          APPLICATION, CONFIG_KSCAN_INIT_PRIORITY,                    \
+                          POST_KERNEL, CONFIG_KSCAN_INIT_PRIORITY,                    \
                           &kscan_rtl87x2g_driver_api);                                  \
     \
     RTL87X2G_KSCAN_IRQ_HANDLER(index)

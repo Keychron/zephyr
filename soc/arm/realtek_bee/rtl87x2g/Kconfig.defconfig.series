@@ -27,6 +27,9 @@ config SYS_CLOCK_TICKS_PER_SEC
 	int
 	default 100
     #10ms/1tick
+	
+config ARCH_HAS_CUSTOM_BUSY_WAIT
+	default y
 
 config IDLE_STACK_SIZE
     default 1024

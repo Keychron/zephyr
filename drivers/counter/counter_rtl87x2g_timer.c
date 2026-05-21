@@ -324,7 +324,7 @@ static int counter_rtl87x2g_timer_pm_action(const struct device *dev,
     const struct counter_rtl87x2g_config *cfg = dev->config;
     struct counter_rtl87x2g_data *data = dev->data;
     void *timer_base = (void *)cfg->reg;
-    int err;
+    // int err;
     extern void ENHTIM_DLPSEnter(void *PeriReg, void *StoreBuf);
     extern void ENHTIM_DLPSExit(void *PeriReg, void *StoreBuf);
     extern void TIM_DLPSEnter(void *PeriReg, void *StoreBuf);

@@ -56,7 +56,7 @@ static void i2c_rtl87x2g_log_err(struct i2c_rtl87x2g_data *data)
     LOG_DBG("i2c_rtl87x2g_log_err line%d\n", __LINE__);
     if (data->errs == I2C_ABRT_7B_ADDR_NOACK)
     {
-        LOG_ERR("7 bit address no ack error");
+        LOG_ERR("7 bit address no ack error,addr:%x",data->slave_address);
     }
 
     if (data->errs == I2C_ABRT_10ADDR1_NOACK || \

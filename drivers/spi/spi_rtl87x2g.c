@@ -24,7 +24,7 @@
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(spi_rtl87x2g, CONFIG_SPI_LOG_LEVEL);
 #include "spi_context.h"
-
+#include "trace.h"
 #ifdef CONFIG_SPI_RTL87X2G_DMA
 
 struct spi_rtl87x2g_dma_data
@@ -547,7 +547,7 @@ static int spi_rtl87x2g_pm_action(const struct device *dev,
     case PM_DEVICE_ACTION_SUSPEND:
 
         SPI_DLPSEnter(spi, &data->store_buf);
-
+        // DBG_DIRECT("spi suspend");
         /* Move pins to sleep state */
         err = pinctrl_apply_state(config->pcfg, PINCTRL_STATE_SLEEP);
         if ((err < 0) && (err != -ENOENT))
@@ -557,6 +557,7 @@ static int spi_rtl87x2g_pm_action(const struct device *dev,
         break;
     case PM_DEVICE_ACTION_RESUME:
         /* Set pins to active state */
+        // DBG_DIRECT("spi resume");
         err = pinctrl_apply_state(config->pcfg, PINCTRL_STATE_DEFAULT);
         if (err < 0)
         {
