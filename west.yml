@@ -23,8 +23,8 @@ manifest:
       url-base: https://github.com/zephyrproject-rtos
     - name: babblesim
       url-base: https://github.com/BabbleSim
-    - name: rtkconnectivity
-      url-base: https://github.com/rtkconnectivity
+    - name: keychron
+      url-base: https://github.com/Keychron
 
   group-filter: [-babblesim, -optional]
 
@@ -214,8 +214,8 @@ manifest:
       groups:
         - hal
     - name: hal_realtek
-      remote: rtkconnectivity
-      revision: main
+      remote: keychron
+      revision: 2.4G
       path: modules/hal/realtek
       groups:
         - hal
